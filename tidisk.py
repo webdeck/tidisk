@@ -853,20 +853,20 @@ class TIDisk(TIDir):
         i = au * self.auSize
         return self.b[i:i+self.auSize]
 
-    def findPossibleBadSectors(self):
-        badSectors = []
-        for sector in range(0, self.totalSectors):
-            sectorType = self.logicalMap[sector]
-            if ((sectorType != '.') and (sectorType != ' ')):
+    def findPossibleBadAUs(self):
+        badAUs = []
+        for au in range(0, self.totalAUs):
+            auType = self.logicalMap[au * self.sectorsPerAU]
+            if ((auType != '.') and (auType != ' ')):
                 for pattern in [0xe5e5, 0xdead, 0xd7a5]:
-                    if (self.doesSectorHaveBadDataPattern(sector, pattern)):
-                        badSectors.append(sector)
+                    if (self.doesAUHaveBadDataPattern(au, pattern)):
+                        badAUs.append(au)
                         break
-        return badSectors
+        return badAUs
 
-    def doesSectorHaveBadDataPattern(self, sector, pattern):
-        start = sector * self.sectorSize
-        end = start + self.sectorSize
+    def doesAUHaveBadDataPattern(self, au, pattern):
+        start = au * self.sectorsPerAU * self.sectorSize
+        end = start + self.sectorsPerAU * self.sectorSize
         for i in range(start, end, 2):
             if (self.wordToInt(self.b[i:i+2]) != pattern):
                 return False
@@ -960,13 +960,14 @@ for i in range(0, disk.totalSectors):
 
 print()
 print('Sectors not in tree with possible FDR or DDR:')
-for i in range(0, disk.totalSectors):
-    if (disk.logicalMap[i] != 'F' and disk.logicalMap[i] != 'D'):
-        sectorBytes = disk.getSector(i)
+for au in range(0, disk.totalAUs):
+    sector = au * disk.sectorsPerAU
+    if (disk.logicalMap[sector] != 'F' and disk.logicalMap[sector] != 'D'):
+        sectorBytes = disk.getSector(sector)
         if (disk.isValidName(sectorBytes[0:10], True)):
             if (disk.bytesToString(sectorBytes[13:16]) == 'DIR' or disk.bytesToString(sectorBytes[28:30]) == 'FI' or
                     (sectorBytes[28] == 0 and sectorBytes[29] == 0)):
-                disk.printSector(i, '  ')
+                disk.printSector(sector, '  ')
 
 print()
 print('ERRORS:')
@@ -1004,7 +1005,8 @@ if (args >= 4):
 
 print()
 print('Possible Bad Sectors:')
-for sector in disk.findPossibleBadSectors():
+for au in disk.findPossibleBadAUs():
+    sector = au * disk.sectorsPerAU
     owner = disk.ownerMap[sector]
     addr = TISectorAddress(disk, logicalSector=sector)
     print('  ' + str(addr) + ' (0x' + hex(disk.wordToInt(disk.getSector(sector))).lstrip('0x').zfill(4) +
